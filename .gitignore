@@ -1,2 +1,9 @@
 # Project exclude paths
 /cmake-build-debug/
+/cmake-build-release/
+/cmake-build-relwithdebinfo/
+/cmake-build-debug-rapsbian/
+/cmake-build-default/
+/cmake-build-release-rapsbian/
+/cmake-build-relwithdebinfo-rapsbian/
+/cmake-build-default-rapsbian/
