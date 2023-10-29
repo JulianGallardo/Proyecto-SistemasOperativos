@@ -1,52 +1,58 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
-#include <semaphore.h>
 #include <unistd.h>
-#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <string.h>
+
 
 #define MAX_CLIENTES_ENTRADA 30
 #define MAX_CLIENTES_FILA 15
-#define CANT_HILOS 80
+#define CANT_PROCESOS 80
 #define CANT_EMPLEADOS 3
 
+/**
+ * Semáforos
+ * - fila_entrada: Controla la cantidad de clientes que pueden entrar al banco. Tipo 1
+ * - mutexPolitico: Controla el acceso a la mesa de entrada de los clientes de tipo político. Tipo 2
+ * - mutexEmpresa: Controla el acceso a la mesa de entrada de los clientes de tipo empresa. Tipo 3
+ * - fila_Politicos: Controla la cantidad de clientes de tipo político que pueden esperar en la fila. Tipo 4
+ * - fila_Empresa: Controla la cantidad de clientes de tipo empresa que pueden esperar en la fila. Tipo 5
+ * - fila_ClienteComun: Controla la cantidad de clientes de tipo común que pueden esperar en la fila. Tipo 6
+ * - CantPoliticosEsperando: Cantidad de clientes de tipo político esperando en la fila. Tipo 7
+ * - CantEmpresasEsperando: Cantidad de clientes de tipo empresa esperando en la fila. Tipo 8
+ * - CantComunesEsperando: Cantidad de clientes de tipo común esperando en la fila. Tipo 9
+ * - pasarALaOficinaPolitico: Controla el acceso a la oficina de los clientes de tipo político. Tipo 10
+ * - pasarALaOficinaEmpresario: Controla el acceso a la oficina de los clientes de tipo empresa. Tipo 11
+ * - pasarALaOficinaComun: Controla el acceso a la oficina de los clientes de tipo común. Tipo 12
+ * - atendido: Controla que el cliente haya sido atendido. Tipo 13
+ * - empleadoEmpresaDormido: Controla que el empleado de empresa esté dormido. Tipo 14
+ * - empleadoComunDormido: Controla que el empleado común esté dormido. Tipo 15
+ * - despertarEmpleadoEmpresa: Controla que el empleado de empresa sea despertado. Tipo 16
+ * - despertarEmpleadoComun: Controla que el empleado común sea despertado. Tipo 17
+ *
+ */
+
+
+struct mensaje{
+    long tipo;
+    char dato1[20];
+};
 
 typedef struct {
-	int id;
-	int type; //1: Politico, 2: Empresa, 3: Cliente común.
+    int id;
+    int type; // 1: Politico, 2: Empresa, 3: Cliente común.
 } Cliente;
 
 
-//Reemplazar todos los semaforos por pipes
-int fila_entrada[2]; //Simula la mesa de entrada
-sem_t fila_Politicos; //Simula la fila de espera de politicos.
-sem_t fila_Empresa;//Simula la fila de espera de Empresas
-sem_t fila_ClienteComun;//Simula la fila de espera de Clientes Comunes
-
-sem_t CantPoliticosEsperando;//Cantidad de politicos esperando
-sem_t CantEmpresasEsperando;//Cantidad de clientes empresarios esperando
-sem_t CantComunesEsperando;//Cantidad de clientes comunes esperando
-
-sem_t despertarEmpleadoEmpresa;
-sem_t despertarEmpleadoComun;
-sem_t empleadoEmpresaDormido;
-sem_t empleadoComunDormido;
-
-sem_t mutexEmpresa;
-sem_t mutexPolitico;
-
-sem_t pasarALaOficinaEmpresario; //Semaforo que indica que el cliente empresario puede pasar a la oficina.
-sem_t pasarALaOficinaPolitico; //Semaforo que indica que el cliente politico puede pasar a la oficina.
-sem_t pasarALaOficinaComun; //Semaforo que indica que el cliente comun puede pasar a la oficina.
-
-sem_t atendido; //Semaforo que indica que el cliente fue atendido por el empleado.
-
 void *empleadoEmpresa(void *arg) {
-	int fila_empleado = (int)arg;
+    int fila_empleado = (int)arg;
     while(1) {
 
-        sem_wait(&mutexPolitico);
-		if(sem_trywait(&CantPoliticosEsperando) == 0) {
+        read(mutexPolitico[0], NULL, 1); // Espera a que haya lugar en la mesa de entrada
+        if(sem_trywait(&CantPoliticosEsperando) == 0) {
             sem_post(&pasarALaOficinaPolitico);
             sem_post(&mutexPolitico);
             sem_post(&fila_Politicos);
@@ -55,8 +61,8 @@ void *empleadoEmpresa(void *arg) {
             sleep(1);
             printf("Politico termino de ser atendido por el empleado %d\n", (fila_empleado + 1));
             sem_post(&atendido);
-		}
-		else {
+        }
+        else {
             sem_post(&mutexPolitico);
             sem_wait(&mutexEmpresa);
             if(sem_trywait(&CantEmpresasEsperando)==0) {
@@ -72,7 +78,7 @@ void *empleadoEmpresa(void *arg) {
             else{
                 sem_post(&mutexEmpresa);
             }
-		}
+        }
 
         sem_wait(&mutexEmpresa);
         if(sem_trywait(&CantEmpresasEsperando)==-1){//Si no hay clientes de tipo empresa o de tipo politicos me duermo.
@@ -95,7 +101,7 @@ void *empleadoEmpresa(void *arg) {
             sem_post(&mutexEmpresa);
         }
 
-	}
+    }
 }
 
 void *empleadoComun(void *arg) {
@@ -175,7 +181,7 @@ void* clientePolitico(void* arg){
     }
 
     free(cliente);
-    pthread_exit(NULL);
+    exit(0);
 }
 
 void* clienteEmpresa(void* arg){
@@ -201,7 +207,7 @@ void* clienteEmpresa(void* arg){
         printf("Empresario %d se retira ya que no hay lugar en la fila de entrada.\n", cliente->id);
     }
     free(cliente);
-    pthread_exit(NULL);
+    exit(0);
 }
 
 void* clienteComun(void* arg){
@@ -226,93 +232,57 @@ void* clienteComun(void* arg){
         printf("Cliente número %d se retira ya que no hay lugar en la fila de entrada.\n", cliente->id);
     }
     free(cliente);
-    pthread_exit(NULL);
+    exit(0);
 }
 
-
-
-
 int main() {
-	//Inicialización semaforos
-	sem_init(&fila_entrada, 0, MAX_CLIENTES_ENTRADA);
-	sem_init(&fila_Empresa, 0, MAX_CLIENTES_FILA);
-    sem_init(&fila_Politicos,0,MAX_CLIENTES_FILA);
-    sem_init(&fila_ClienteComun,0,MAX_CLIENTES_FILA);
-    sem_init(&CantEmpresasEsperando,0,0);
-    sem_init(&CantComunesEsperando,0,0);
-    sem_init(&CantPoliticosEsperando,0,0);
-    sem_init(&despertarEmpleadoEmpresa,0,0);
-    sem_init(&despertarEmpleadoComun,0,0);
-    sem_init(&empleadoEmpresaDormido,0,0);
-    sem_init(&empleadoComunDormido,0,0);
-    sem_init(&mutexEmpresa,0,1);
-    sem_init(&mutexPolitico,0,1);
-    sem_init(&pasarALaOficinaEmpresario,0,0);
-    sem_init(&pasarALaOficinaPolitico,0,0);
-    sem_init(&pasarALaOficinaComun,0,0);
-    sem_init(&atendido,0,0);
+    //Inicio la cola de mensajes
+    int queueID=0;
+    key_t key;
+    key = ftok("/tmp", 'A');
+    queueID=msgget(key, 0666|IPC_CREAT);
 
 
 
-    //Inicialización hilos
-	pthread_t hilos[CANT_HILOS];
-	pthread_t hilos_empleados[3];
-	for(int i = 0; i < CANT_EMPLEADOS; i++) {
-		int fila = i;
-		pthread_t hilo_empleado;
-        if(i==0){
-            pthread_create(&hilo_empleado, NULL, empleadoComun, (void *)fila);
+    // Creación de procesos
+    for (int i = 0; i < CANT_EMPLEADOS; i++) {
+        int pid = fork();
+        if (pid == 0) {
+            int fila = i;
+            if (i == 0) {
+                empleadoComun(&fila);
+            } else {
+                empleadoEmpresa(&fila);
+            }
+            exit(0);
         }
-        else{
-            pthread_create(&hilo_empleado, NULL, empleadoEmpresa, (void *)fila);
+    }
+
+    for (int i = 0; i < CANT_PROCESOS; i++) {
+        Cliente *cliente = (Cliente *)malloc(sizeof(Cliente));
+        cliente->id = i;
+        cliente->type = rand() % 3 + 1;
+        int pid = fork();
+        if (pid == 0) {
+
+            switch (cliente->type) {
+                case 1: // Politico
+                    clientePolitico(cliente);
+                    break;
+                case 2: // Empresa
+                    clienteEmpresa(cliente);
+                    break;
+                case 3: // Comun
+                    clienteComun(cliente);
+                    break;
+            }
+            exit(0);
         }
-		hilos_empleados[i] = hilo_empleado;
-	}
-	for(int i = 0; i < CANT_HILOS; i++) {
-		Cliente *cliente = (Cliente *) malloc(sizeof(Cliente));
-		cliente->id = i;
-		cliente->type = rand() % 3 + 1;
+    }
 
-		pthread_t hilo_cliente;
-        switch(cliente->type) {
-            case 1: //Politico
-                pthread_create(&hilo_cliente, NULL, clientePolitico, (void *) cliente); break;
-            case 2: //Empresa
-                pthread_create(&hilo_cliente, NULL, clienteEmpresa, (void *) cliente); break;
-            case 3: //Comun
-                pthread_create(&hilo_cliente, NULL, clienteComun, (void *) cliente); break;
-        }
-		hilos[i] = hilo_cliente;
-        if(i % 30==0){
-            sleep(4);
-        }
-	}
+    for (int i = 0; i < CANT_PROCESOS + CANT_EMPLEADOS; i++) {
+        wait(NULL);
+    }
 
-	for(int i = 0; i < CANT_HILOS; i++) {
-		pthread_join(hilos[i], NULL);
-	}
-	for(int i = 0; i < 3; i++) {
-		pthread_cancel(hilos_empleados[i]);
-	}
-
-	//Liberación de memoria semaforos
-	sem_destroy(&fila_entrada);
-    sem_destroy(&fila_Empresa);
-    sem_destroy(&fila_Politicos);
-    sem_destroy(&fila_ClienteComun);
-    sem_destroy(&CantEmpresasEsperando);
-    sem_destroy(&CantComunesEsperando);
-    sem_destroy(&CantPoliticosEsperando);
-    sem_destroy(&despertarEmpleadoEmpresa);
-    sem_destroy(&despertarEmpleadoComun);
-    sem_destroy(&empleadoEmpresaDormido);
-    sem_destroy(&empleadoComunDormido);
-    sem_destroy(&mutexEmpresa);
-    sem_destroy(&mutexPolitico);
-    sem_destroy(&pasarALaOficinaEmpresario);
-    sem_destroy(&pasarALaOficinaPolitico);
-    sem_destroy(&pasarALaOficinaComun);
-    sem_destroy(&atendido);
-
-	return 0;
+    return 0;
 }

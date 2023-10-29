@@ -5,7 +5,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define CANT_HILOS 80
+#define CANT_HILOS 25
 #define CANT_HORARIOS 12
 #define CANT_CONSULTAS 4
 
