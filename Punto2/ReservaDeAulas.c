@@ -15,6 +15,7 @@ int horarios[CANT_HORARIOS]; //Los horarios son de 9:00 a 21:00
 //Semaforos
 sem_t semAccesoReserva;
 sem_t cantConsultas;
+sem_t mutex;
 
 int numeroRandom(int adicion){
     // Semilla para la generación de números aleatorios
@@ -52,12 +53,15 @@ void cancelarReserva(int idAlumno){
 
 void consultarHorariosReserva(int idAlumno){
     int i= numeroRandom(idAlumno*2) % 12;
+    sem_wait(&mutex);
     if(sem_trywait(&cantConsultas)==0){ //Vemos si hay gente consultando ya.
         sem_post(&cantConsultas);
+        sem_post(&mutex);
     }
     else{//Si no hay gente consultando intentamos tomar el mutex.
         sem_wait(&semAccesoReserva);
         sem_post(&cantConsultas);
+        sem_post(&mutex);
     }
 
     if(horarios[i]!=0){
@@ -70,11 +74,14 @@ void consultarHorariosReserva(int idAlumno){
 
 
     sem_wait(&cantConsultas);
+    sem_wait(&mutex);
     if(sem_trywait(&cantConsultas)==0){//Si todavia queda gente consultando, no hago nada
         sem_post(&cantConsultas);
+        sem_post(&mutex);
     }
     else{//Si soy la ultima consulta libero el mutex.
         sem_post(&semAccesoReserva);
+        sem_post(&mutex);
     }
 
 }
@@ -105,6 +112,7 @@ int main(){
     //Inicializacion de los semaforos
     sem_init(&semAccesoReserva,0,1);  //Semaforo Reservas
     sem_init(&cantConsultas,0,0);  //Semaforo cantidad consultas
+    sem_init(&mutex,0,1);  //Semaforo mutex
     //Creación de hilos
     pthread_t hilos[CANT_HILOS];
 
@@ -131,6 +139,7 @@ int main(){
 
     sem_destroy(&semAccesoReserva);
     sem_destroy(&cantConsultas);
+    sem_destroy(&mutex);
 
     return 0;
 }

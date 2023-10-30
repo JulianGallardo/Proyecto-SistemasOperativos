@@ -18,6 +18,7 @@ struct compartido{
     int horarios[CANT_HORARIOS]; //Los horarios son de 9:00 a 21:00
     sem_t semAccesoReserva;
     sem_t cantConsultas;
+    sem_t mutex;
 };
 int numeroRandom(int adicion){
     // Semilla para la generación de números aleatorios
@@ -55,12 +56,15 @@ void cancelarReserva(int idAlumno,struct compartido* compartido){
 
 void consultarHorariosReserva(int idAlumno,struct compartido* compartido){
     int i= numeroRandom(idAlumno*2) % 12;
+    sem_wait(&compartido->mutex);
     if(sem_trywait(&compartido->cantConsultas)==0){ //Vemos si hay gente consultando ya.
         sem_post(&compartido->cantConsultas);
+        sem_post(&compartido->mutex);
     }
     else{//Si no hay gente consultando intentamos tomar el mutex.
         sem_wait(&compartido->semAccesoReserva);
         sem_post(&compartido->cantConsultas);
+        sem_post(&compartido->mutex);
     }
 
     if(compartido->horarios[i]!=0){
@@ -73,11 +77,14 @@ void consultarHorariosReserva(int idAlumno,struct compartido* compartido){
 
 
     sem_wait(&compartido->cantConsultas);
+    sem_wait(&compartido->mutex);
     if(sem_trywait(&compartido->cantConsultas)==0){//Si todavia queda gente consultando, no hago nada
         sem_post(&compartido->cantConsultas);
+        sem_post(&compartido->mutex);
     }
     else{//Si soy la ultima consulta libero el mutex.
         sem_post(&compartido->semAccesoReserva);
+        sem_post(&compartido->mutex);
     }
 
 }
@@ -116,6 +123,7 @@ int main(){
     //Inicializacion de los semaforos
     sem_init(&compartido->semAccesoReserva,1,1);  //Semaforo Reservas
     sem_init(&compartido->cantConsultas,1,0);  //Semaforo cantidad consultas
+    sem_init(&compartido->mutex,1,1);  //Semaforo mutex (para la cantidad de consultas
     //Creación de hilos
     
 
@@ -146,6 +154,7 @@ int main(){
 
     sem_destroy(&compartido->semAccesoReserva);
     sem_destroy(&compartido->cantConsultas);
+    sem_destroy(&compartido->mutex);
 
     // Liberar la memoria compartida
     shmdt(compartido);

@@ -18,7 +18,7 @@ typedef struct {
 
 
 //Reemplazar todos los semaforos por pipes
-int fila_entrada[2]; //Simula la mesa de entrada
+sem_t fila_entrada; //Simula la mesa de entrada
 sem_t fila_Politicos; //Simula la fila de espera de politicos.
 sem_t fila_Empresa;//Simula la fila de espera de Empresas
 sem_t fila_ClienteComun;//Simula la fila de espera de Clientes Comunes
@@ -34,6 +34,7 @@ sem_t empleadoComunDormido;
 
 sem_t mutexEmpresa;
 sem_t mutexPolitico;
+sem_t mutexComun;
 
 sem_t pasarALaOficinaEmpresario; //Semaforo que indica que el cliente empresario puede pasar a la oficina.
 sem_t pasarALaOficinaPolitico; //Semaforo que indica que el cliente politico puede pasar a la oficina.
@@ -51,7 +52,7 @@ void *empleadoEmpresa(void *arg) {
             sem_post(&mutexPolitico);
             sem_post(&fila_Politicos);
             usleep(1000);
-            printf("Politico es atendido por el empleado ---%d\n", (fila_empleado + 1));
+            printf("Politico es atendido por el empleado %d\n", (fila_empleado + 1));
             sleep(1);
             printf("Politico termino de ser atendido por el empleado %d\n", (fila_empleado + 1));
             sem_post(&atendido);
@@ -64,7 +65,7 @@ void *empleadoEmpresa(void *arg) {
                 sem_post(&mutexEmpresa);
                 sem_post(&fila_Empresa);
                 usleep(1000);
-                printf("Cliente empresario es atendido por el empleado ---%d\n", (fila_empleado + 1));
+                printf("Cliente empresario es atendido por el empleado %d\n", (fila_empleado + 1));
                 sleep(1);
                 printf("Cliente empresario termino de ser atendido por el empleado %d\n", (fila_empleado + 1));
                 sem_post(&atendido);
@@ -109,7 +110,7 @@ void *empleadoComun(void *arg) {
             sem_post(&mutexPolitico);
             sem_post(&fila_Politicos);
             usleep(1000);
-            printf("Politico es atendido por el empleado ---%d\n", (fila_empleado + 1));
+            printf("Politico es atendido por el empleado %d\n", (fila_empleado + 1));
             sleep(1);
             printf("Politico termino de ser atendido por el empleado %d\n", (fila_empleado + 1));
             sem_post(&atendido);
@@ -120,14 +121,17 @@ void *empleadoComun(void *arg) {
                 sem_post(&pasarALaOficinaComun);
                 sem_post(&fila_ClienteComun);
                 usleep(1000);
-                printf("Cliente comun es atendido por el empleado --- %d\n", (fila_empleado + 1));
+                printf("Cliente comun es atendido por el empleado %d\n", (fila_empleado + 1));
                 sleep(1);
                 printf("Cliente comun termino de ser atendido por el empleado %d\n", (fila_empleado + 1));
                 sem_post(&atendido);
             }
         }
 
+
+        sem_wait(&mutexComun);
         if(sem_trywait(&CantComunesEsperando)==-1){//Si no hay clientes de tipo empresa o de tipo politicos me duermo.
+            sem_post(&mutexComun);
             sem_wait(&mutexPolitico);
             if(sem_trywait(&CantPoliticosEsperando)==-1){
                 sem_post(&empleadoComunDormido);
@@ -142,6 +146,7 @@ void *empleadoComun(void *arg) {
         }
         else{
             sem_post(&CantComunesEsperando);
+            sem_post(&mutexComun);
         }
     }
 }
@@ -157,6 +162,8 @@ void* clientePolitico(void* arg){
         printf("Politico %d entra a la fila de politicos\n",cliente->id);
         sem_post(&fila_entrada);
 
+        sem_wait(&mutexEmpresa);
+        sem_wait(&mutexPolitico);
         if(sem_trywait(&empleadoEmpresaDormido)==0){//Si hay un empleadoEmpresa dormido lo despierta
             sem_post(&despertarEmpleadoEmpresa);
         }
@@ -165,6 +172,9 @@ void* clientePolitico(void* arg){
                 sem_post(&despertarEmpleadoComun);
             }
         }
+        sem_post(&mutexPolitico);
+        sem_post(&mutexEmpresa);
+
         sem_wait(&pasarALaOficinaPolitico);
         printf("Politico %d pasa a la oficina\n",cliente->id);
         sem_wait(&atendido);
@@ -188,10 +198,15 @@ void* clienteEmpresa(void* arg){
         printf("Empresario %d entra a la fila de empresas\n",cliente->id);
         sem_post(&fila_entrada);
 
+        sem_wait(&mutexPolitico);
+        sem_wait(&mutexEmpresa);
         if(sem_trywait(&empleadoEmpresaDormido)==0){
             printf("El empresario %d despierta un empleado de empresa dormido\n",cliente->id);
             sem_post(&despertarEmpleadoEmpresa);
         }
+        sem_post(&mutexEmpresa);
+        sem_post(&mutexPolitico);
+
         sem_wait(&pasarALaOficinaEmpresario);
         printf("Empresario %d pasa a la oficina\n",cliente->id);
         sem_wait(&atendido);
@@ -214,9 +229,16 @@ void* clienteComun(void* arg){
         sem_post(&CantComunesEsperando);
         printf("Cliente número %d entra a la fila de clientes comunes\n",cliente->id);
         sem_post(&fila_entrada);
+
+        sem_wait(&mutexComun);
+        sem_wait(&mutexPolitico);
+
         if(sem_trywait(&empleadoComunDormido)==0){
             sem_post(&despertarEmpleadoComun);
         }
+        sem_post(&mutexPolitico);
+        sem_post(&mutexComun);
+
         sem_wait(&pasarALaOficinaComun);
         printf("Cliente número %d pasa a la oficina\n",cliente->id);
         sem_wait(&atendido);
@@ -247,6 +269,7 @@ int main() {
     sem_init(&empleadoComunDormido,0,0);
     sem_init(&mutexEmpresa,0,1);
     sem_init(&mutexPolitico,0,1);
+    sem_init(&mutexComun,0,1);
     sem_init(&pasarALaOficinaEmpresario,0,0);
     sem_init(&pasarALaOficinaPolitico,0,0);
     sem_init(&pasarALaOficinaComun,0,0);
@@ -295,6 +318,8 @@ int main() {
 		pthread_cancel(hilos_empleados[i]);
 	}
 
+    printf("Cierra el banco");
+
 	//Liberación de memoria semaforos
 	sem_destroy(&fila_entrada);
     sem_destroy(&fila_Empresa);
@@ -309,10 +334,12 @@ int main() {
     sem_destroy(&empleadoComunDormido);
     sem_destroy(&mutexEmpresa);
     sem_destroy(&mutexPolitico);
+    sem_destroy(&mutexComun);
     sem_destroy(&pasarALaOficinaEmpresario);
     sem_destroy(&pasarALaOficinaPolitico);
     sem_destroy(&pasarALaOficinaComun);
     sem_destroy(&atendido);
+
 
 	return 0;
 }
