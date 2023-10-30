@@ -18,7 +18,7 @@ run: $(EXECUTABLE)
 clean:
 	rm -f $(OBJS) $(EXECUTABLE)
 
-.PHONY: run clean
+.PHONY: run clean all
 
 	
 	
