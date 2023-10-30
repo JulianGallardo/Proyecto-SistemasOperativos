@@ -1,24 +1,25 @@
-CC = gcc
-CFLAGS = -Wall -Wextra
-SOURCES = cat.c chmod.c gelp.c ls.c minishell.c mkdir.c rmdir.c touch.c
-OBJS = $(SOURCES:.c=.o)
-EXECUTABLE = minishell
+compilar: *.c
+gcc cat.c -o cat
+gcc minishell.c -o minishell
+gcc touch.c -o touch
+gcc mkdir.c -o mkdir
+gcc rmdir.c -o rmdir
+gcc chmod.c -o chmod
+gcc ls.c -o ls
+gcc help.c -o help
 
-all: $(EXECUTABLE)
-
-$(EXECUTABLE): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS)
-
-%.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-run: $(EXECUTABLE)
-	./$(EXECUTABLE)
+run:
+./minishell
 
 clean:
-	rm -f $(OBJS) $(EXECUTABLE)
-
-.PHONY: run clean all
+rm cat
+rm minishell
+rm touch
+rm mkdir
+rm rmdir
+rm chmod
+rm ls
+rm help
 
 	
 	
