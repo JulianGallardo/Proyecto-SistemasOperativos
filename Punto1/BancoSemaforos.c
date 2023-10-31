@@ -291,6 +291,9 @@ int main() {
         }
 		hilos_empleados[i] = hilo_empleado;
 	}
+
+    printf("Abre el banco\n");
+
 	for(int i = 0; i < CANT_HILOS; i++) {
 		Cliente *cliente = (Cliente *) malloc(sizeof(Cliente));
 		cliente->id = i;
