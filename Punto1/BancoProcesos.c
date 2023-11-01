@@ -388,6 +388,7 @@ int main() {
 
 
     int pid;
+    int* pidEmpleados= malloc(sizeof (int)*CANT_EMPLEADOS);
 
     // Creación de procesos
     int fila[CANT_EMPLEADOS]; // Declarar el array como un arreglo de enteros
@@ -396,6 +397,7 @@ int main() {
         fila[i] = i ; // Asignar un valor único a cada empleado
         pid = fork();
         if (pid == 0) {
+            pidEmpleados[i]=getpid();
             if (i == 0) {
                 empleadoComun(fila[i]);
             } else {
@@ -432,6 +434,11 @@ int main() {
         wait(NULL);
     }
 
+    for (int i = 0; i < CANT_EMPLEADOS; ++i) {
+        kill(pidEmpleados[i],SIGTERM);
+    }
+
+
     if (msgctl(queueID, IPC_RMID, NULL) == -1) {
         perror("Error al eliminar la cola de mensajes");
         exit(1);
@@ -440,6 +447,7 @@ int main() {
 
 
     free(mensaje);
+    free(pidEmpleados);
 
 
     return 0;
