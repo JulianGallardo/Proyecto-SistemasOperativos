@@ -30,7 +30,7 @@ int numeroRandom(int adicion){
 
 void reservarAula(int idAlumno,struct compartido* compartido){
     int horarioAReservar=(numeroRandom(idAlumno) % 12);
-    sem_wait(&compartido->semAccesoReserva);
+    sem_wait(&compartido->semAccesoReserva);//Espero a poder acceder a la reserva
     if(compartido->horarios[horarioAReservar]==0) {
         compartido->horarios[horarioAReservar] = idAlumno;
         printf("El alumno %d reservo el horario %d\n",idAlumno,horarioAReservar+9);
@@ -38,12 +38,12 @@ void reservarAula(int idAlumno,struct compartido* compartido){
     else{
         printf("El alumno %d no pudo reservar el horario %d\n",idAlumno,horarioAReservar+9);
     }
-    sem_post(&compartido->semAccesoReserva);
+    sem_post(&compartido->semAccesoReserva);//Libero el semaforo de reservas
 }
 
 void cancelarReserva(int idAlumno,struct compartido* compartido){
     int horarioAReservar=(numeroRandom(idAlumno) % 12);
-    sem_wait(&compartido->semAccesoReserva);
+    sem_wait(&compartido->semAccesoReserva);//Espero a poder acceder a la reserva
     if(compartido->horarios[horarioAReservar]==idAlumno) {
         compartido->horarios[horarioAReservar] = 0;
         printf("El alumno %d cancelo la reserva del horario %d \n",idAlumno,horarioAReservar+9);
@@ -51,17 +51,17 @@ void cancelarReserva(int idAlumno,struct compartido* compartido){
     else{
         printf("El alumno %d no pudo cancelar la reserva del horario %d \n",idAlumno,horarioAReservar+9);
     }
-    sem_post(&compartido->semAccesoReserva);
+    sem_post(&compartido->semAccesoReserva);//Libero el semaforo de reservas
 }
 
 void consultarHorariosReserva(int idAlumno,struct compartido* compartido){
     int i= numeroRandom(idAlumno*2) % 12;
-    sem_wait(&compartido->mutex);
+    sem_wait(&compartido->mutex);//Espero a poder acceder al mutex
     if(sem_trywait(&compartido->cantConsultas)==0){ //Vemos si hay gente consultando ya.
         sem_post(&compartido->cantConsultas);
         sem_post(&compartido->mutex);
     }
-    else{//Si no hay gente consultando intentamos tomar el mutex.
+    else{//Si no hay gente consultando intentamos tomar el acceso a la tabla de reservas.
         sem_wait(&compartido->semAccesoReserva);
         sem_post(&compartido->cantConsultas);
         sem_post(&compartido->mutex);
@@ -76,13 +76,13 @@ void consultarHorariosReserva(int idAlumno,struct compartido* compartido){
 
 
 
-    sem_wait(&compartido->cantConsultas);
-    sem_wait(&compartido->mutex);
+    sem_wait(&compartido->cantConsultas);//Indico que termine de consultar
+    sem_wait(&compartido->mutex);//Espero a tomar el mutex
     if(sem_trywait(&compartido->cantConsultas)==0){//Si todavia queda gente consultando, no hago nada
         sem_post(&compartido->cantConsultas);
         sem_post(&compartido->mutex);
     }
-    else{//Si soy la ultima consulta libero el mutex.
+    else{//Si soy la ultima consulta libero el acceso a la tabla de reservas.
         sem_post(&compartido->semAccesoReserva);
         sem_post(&compartido->mutex);
     }
@@ -96,7 +96,7 @@ void* Alumno(void* idAlumnoPuntero){
     compartido = (struct compartido *) shmat(id, 0, 0);
     int* idAlumno=(int*)idAlumnoPuntero;
     int decision,i;
-    for(i=0;i<CANT_CONSULTAS;i++){
+    for(i=0;i<CANT_CONSULTAS;i++){//Cada alumno hace 4 consultas
         decision=(numeroRandom(*idAlumno) % 4);
         if(decision<2){
             reservarAula(*idAlumno,compartido);
@@ -134,7 +134,6 @@ int main(){
     for(i=0;i<CANT_HORARIOS;i++){
         compartido->horarios[i]=0;
     }
-
 
     for(i=0;i<CANT_PROCESOS;i++) {
         idAlumnos[i]=i+1;

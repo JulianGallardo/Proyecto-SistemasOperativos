@@ -23,8 +23,8 @@ void changePermissions(char *fileName, char *permissions){
     unsigned int permissionsInt=0;
     sscanf(permissions,"%o",&permissionsInt);//Cambiamos los permisos a octal
 
-    if(chmod(fileName,permissionsInt)==-1){
-        perror("");
+    if(chmod(fileName,permissionsInt)==-1){//Cambiamos los permisos del archivo, en caso de que falle mostramos el error
+        perror("No se pudo cambiar los permisos del archivo");
         exit(EXIT_FAILURE);
     }
 }

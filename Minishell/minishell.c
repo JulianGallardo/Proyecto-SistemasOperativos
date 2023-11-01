@@ -45,11 +45,11 @@ int main(){
             if (strcmp(cmd, "") == 0) { //Si no se ingreso ningun comando, imprimimos el error
                 printf("Shell>>No se ingreso ningun comando\n");
             }
-            else if (strcmp(cmd, "cd") == 0) {
+            else if (strcmp(cmd, "cd") == 0) {//Si el comando es cd cambiamos el directorio de la minishell.
                 changeDirectory(argv[1]);
                 }
             else {
-                if (strcmp(cmd, "pwd") == 0) {
+                if (strcmp(cmd, "pwd") == 0) {//Mostramos el directorio actual de la minishell
                     printWorkingDirectory();
                 } else {
                     pid = fork();
@@ -85,7 +85,7 @@ void parseCMD(char *cmd, char **argv){
     char *token;
     int i=0;
     token = strtok(cmd," ");
-    while(token!=NULL){
+    while(token!=NULL){//Mientras haya tokens, los guardo en el arreglo de argumentos
         argv[i]=token;
         i++;
         token=strtok(NULL," ");
@@ -94,7 +94,7 @@ void parseCMD(char *cmd, char **argv){
 }
 
 void changeDirectory(char *dirName){
-    if(chdir(dirName)==-1){
+    if(chdir(dirName)==-1){ //Si no se pudo cambiar de directorio
         printf("Shell>>Error al cambiar de directorio\n");
     }
 }

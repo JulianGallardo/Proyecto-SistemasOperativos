@@ -4,6 +4,6 @@ ReservaDeAulasHilos: ReservaDeAulasHilos.c
 	rm ReservaDeAulasHilos
 
 ReservaDeAulasProcesos: ReservaDeAulasProcesos.c
-	gcc ReservaDeAulasProcesos.c -o ReservaDeAulasProcesos
+	gcc ReservaDeAulasProcesos.c -o ReservaDeAulasProcesos -pthread
 	./ReservaDeAulasProcesos
 	rm ReservaDeAulasProcesos
